@@ -1,0 +1,18 @@
+{
+  "font_name": "Arial",
+  "font_size": 56,
+  "primary_color": "&H00FFFFFF",
+  "highlight_color": "&H00CCFFFF",
+  "outline_color": "&H00333333",
+  "back_color": "&H50000000",
+  "outline_width": 1,
+  "shadow": 1,
+  "alignment": 2,
+  "margin_l": 80,
+  "margin_r": 80,
+  "margin_v": 90,
+  "max_words_per_line": 6,
+  "animation_preset": "smooth",
+  "karaoke_speed": 0.95,
+  "text_case": "none"
+}

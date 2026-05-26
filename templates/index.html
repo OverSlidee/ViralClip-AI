@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ViralClip AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Sora:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <main class="shell aura-bg">
+    <section class="hero panel glass">
+      <div>
+        <p class="eyebrow">Local AI Studio</p>
+        <h1>ViralClip AI</h1>
+        <p>Convert long-form YouTube videos into polished shorts with face tracking, B-roll, and branded captions.</p>
+      </div>
+      <div class="health" id="healthBar">
+        <span class="chip" id="ffmpegChip">FFmpeg: checking</span>
+        <span class="chip" id="ollamaChip">Ollama: checking</span>
+      </div>
+    </section>
+
+    <section class="panel grid-main">
+      <div class="controls card-surface">
+        <h2>Source</h2>
+        <label for="url">YouTube URL</label>
+        <input id="url" type="url" placeholder="https://www.youtube.com/watch?v=..." required>
+
+        <div class="grid two">
+          <div>
+            <label for="ollamaModel">Ollama model</label>
+            <select id="ollamaModel"></select>
+          </div>
+          <div>
+            <label for="whisperModel">Whisper model</label>
+            <select id="whisperModel">
+              <option value="tiny">tiny</option>
+              <option value="base" selected>base</option>
+              <option value="small">small</option>
+              <option value="medium">medium</option>
+              <option value="large-v3">large-v3</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid three">
+          <div>
+            <label for="clipCount">Clip count</label>
+            <input id="clipCount" type="number" min="1" max="8" value="4">
+          </div>
+          <div>
+            <label for="minClipDuration">Min duration (s)</label>
+            <input id="minClipDuration" type="number" min="15" max="120" value="30">
+          </div>
+          <div>
+            <label for="maxClipDuration">Max duration (s)</label>
+            <input id="maxClipDuration" type="number" min="20" max="180" value="90">
+          </div>
+        </div>
+
+        <label>Caption template</label>
+        <div class="template-grid" id="templateGrid">
+          <label class="template-card active" data-template="viral_bold">
+            <input type="radio" name="template" value="viral_bold" checked>
+            <h3>Viral Bold</h3>
+            <p>High-impact, thick outline, maximum readability.</p>
+          </label>
+          <label class="template-card" data-template="neon_pop">
+            <input type="radio" name="template" value="neon_pop">
+            <h3>Neon Pop</h3>
+            <p>Energetic neon look for punchy social edits.</p>
+          </label>
+          <label class="template-card" data-template="minimal_clean">
+            <input type="radio" name="template" value="minimal_clean">
+            <h3>Minimal Clean</h3>
+            <p>Understated premium style for talking-head content.</p>
+          </label>
+        </div>
+
+        <div class="grid two toggles">
+          <label class="toggle">
+            <input id="faceTracking" type="checkbox">
+            <span>Face tracking reframe</span>
+          </label>
+
+          <label class="toggle">
+            <input id="brollEnabled" type="checkbox">
+            <span>Enable B-roll</span>
+          </label>
+        </div>
+
+        <label class="toggle">
+          <input id="abTestMode" type="checkbox">
+          <span>A/B B-roll mode (auto-pick best variant)</span>
+        </label>
+
+        <div class="grid three">
+          <div>
+            <label for="hookRecut">Hook-first recut</label>
+            <select id="hookRecut">
+              <option value="true">Enabled</option>
+              <option value="false" selected>Disabled</option>
+            </select>
+          </div>
+          <div>
+            <label for="hookDuration">Hook duration (s)</label>
+            <input id="hookDuration" type="number" min="2" max="6" step="0.5" value="4">
+          </div>
+          <div>
+            <label for="captionEnergy">Caption energy</label>
+            <input id="captionEnergy" type="number" min="0.7" max="1.5" step="0.1" value="1.0">
+          </div>
+        </div>
+
+        <div id="brollOptions" class="broll hidden">
+          <label>B-roll source</label>
+          <div class="row">
+            <label><input type="radio" name="brollSource" value="local" checked> Local library</label>
+            <label><input type="radio" name="brollSource" value="pexels"> Pexels</label>
+            <label><input type="radio" name="brollSource" value="both"> Both</label>
+          </div>
+          <label for="brollStyle">B-roll style</label>
+          <select id="brollStyle">
+            <option value="safe_pip" selected>Speaker-safe PiP</option>
+            <option value="fullscreen">Fullscreen overlay</option>
+          </select>
+          <label for="pexelsApiKey">Pexels API key (optional unless Pexels selected)</label>
+          <input id="pexelsApiKey" type="text" placeholder="Pexels API key">
+          <p class="hint">Drop local B-roll files into the broll_library folder. Filename keywords improve matching.</p>
+        </div>
+
+        <button id="runBtn">Generate Shorts</button>
+      </div>
+
+      <aside class="panel side card-surface">
+        <h2>Progress</h2>
+        <ul id="progressList" class="timeline"></ul>
+      </aside>
+    </section>
+
+    <section class="panel card-surface">
+      <h2>Results</h2>
+      <div id="results" class="results"></div>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

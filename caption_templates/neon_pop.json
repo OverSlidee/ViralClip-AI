@@ -1,0 +1,18 @@
+{
+  "font_name": "Arial Bold",
+  "font_size": 66,
+  "primary_color": "&H00FFFF00",
+  "highlight_color": "&H0000FFFF",
+  "outline_color": "&H00AA2200",
+  "back_color": "&H28000000",
+  "outline_width": 3,
+  "shadow": 3,
+  "alignment": 5,
+  "margin_l": 50,
+  "margin_r": 50,
+  "margin_v": 120,
+  "max_words_per_line": 5,
+  "animation_preset": "pop",
+  "karaoke_speed": 1.2,
+  "text_case": "upper"
+}

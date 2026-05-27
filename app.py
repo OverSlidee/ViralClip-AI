@@ -20,7 +20,7 @@ from pipeline.analyzer import find_clips, pick_hook_window, rank_clips
 from pipeline.broll import choose_local_broll, fetch_pexels_broll, plan_broll_keywords
 from pipeline.captions import build_ass_file
 from pipeline.clipper import render_clip
-from pipeline.downloader import download_video
+from pipeline.downloader import cookies_configured, download_video
 from pipeline.face_tracker import detect_face_center_x, detect_face_timeline, suggest_safe_side
 from pipeline.transcriber import transcribe
 
@@ -73,7 +73,6 @@ class ProcessRequest(BaseModel):
     broll_style: str = Field(default="safe_pip", pattern="^(safe_pip|fullscreen)$")
     ab_test_mode: bool = False
     pexels_api_key: str = ""
-    cookies_file: str = ""  # Path to an uploaded cookies.txt for VPS bot-detection bypass
 
 
 JOBS: Dict[str, Dict[str, Any]] = {}
@@ -213,12 +212,7 @@ async def _run_pipeline(job_id: str, req: ProcessRequest) -> None:
 
     try:
         _emit(job_id, "downloading", "Downloading source video")
-        cookies_path = Path(req.cookies_file) if req.cookies_file else None
-        if cookies_path and not cookies_path.exists():
-            cookies_path = None
-        video_path, audio_path, base_id = await asyncio.to_thread(
-            download_video, req.url, dl_dir, cookies_path
-        )
+        video_path, audio_path, base_id = await asyncio.to_thread(download_video, req.url, dl_dir)
 
         _emit(job_id, "transcribing", "Generating timestamped transcript")
         words = await asyncio.to_thread(transcribe, audio_path, req.whisper_model)
@@ -475,33 +469,36 @@ async def templates_meta() -> Dict[str, Any]:
 @app.get("/api/health")
 async def health() -> Dict[str, Any]:
     deps = await asyncio.to_thread(_dependency_health)
-    return {"ok": deps["ffmpeg"]["ok"] and deps["ollama"]["ok"], "dependencies": deps}
+    return {
+        "ok": deps["ffmpeg"]["ok"] and deps["ollama"]["ok"],
+        "dependencies": deps,
+        "youtube_cookies": cookies_configured(),
+    }
 
 
-# Directory where uploaded cookies files are stored (excluded from git via .gitignore).
+# Admin-only: directory where uploaded cookies files are stored.
 COOKIES_DIR = BASE_DIR / "uploads" / "cookies"
 COOKIES_DIR.mkdir(parents=True, exist_ok=True)
 
 
-@app.post("/api/upload-cookies")
+@app.post("/api/admin/upload-cookies")
 async def upload_cookies(file: UploadFile = File(...)) -> Dict[str, str]:
-    """Accept a Netscape-format cookies.txt file and return its server path."""
+    """Admin endpoint: upload a Netscape-format cookies.txt to enable YouTube downloads on VPS."""
     if file.filename and not file.filename.endswith(".txt"):
         raise HTTPException(status_code=400, detail="Please upload a .txt cookies file.")
 
-    # Overwrite any previous upload — one file per instance is enough.
     dest = COOKIES_DIR / "youtube_cookies.txt"
     content = await file.read()
-    if len(content) > 5 * 1024 * 1024:  # 5 MB sanity limit
+    if len(content) > 5 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="Cookies file is too large (max 5 MB).")
     dest.write_bytes(content)
-    return {"cookies_file": str(dest), "message": "Cookies uploaded successfully."}
+    return {"message": "Cookies uploaded. YouTube downloads are now authenticated.", "active": True}
 
 
-@app.get("/api/cookies-status")
+@app.get("/api/admin/cookies-status")
 async def cookies_status() -> Dict[str, Any]:
-    dest = COOKIES_DIR / "youtube_cookies.txt"
-    return {"uploaded": dest.exists(), "path": str(dest) if dest.exists() else ""}
+    """Admin endpoint: check whether a cookies file is configured."""
+    return {"active": cookies_configured()}
 
 
 @app.post("/api/process")

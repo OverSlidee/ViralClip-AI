@@ -7,121 +7,58 @@ from typing import Tuple
 import yt_dlp
 from yt_dlp.utils import DownloadError
 
-# VPS-friendly headers that reduce the chance of being fingerprinted as a bot.
-_BROWSER_HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/124.0.0.0 Safari/537.36"
-    ),
-    "Accept-Language": "en-US,en;q=0.9",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-}
-
-_BOT_SIGNALS = (
-    "sign in to confirm",
-    "cookies",
-    "cookie database",
-    "blocked",
-    "bot",
-    "too many requests",
-)
-
-# Candidate locations where the server admin can drop a cookies.txt file.
-# Checked in order; the first existing file wins.
-_APP_DIR = Path(__file__).resolve().parent.parent
-_COOKIE_CANDIDATES = [
-    # 1. Explicit env var — highest priority.
-    Path(os.environ["YOUTUBE_COOKIES_FILE"]) if os.environ.get("YOUTUBE_COOKIES_FILE") else None,
-    # 2. Uploaded via the admin settings page.
-    _APP_DIR / "uploads" / "cookies" / "youtube_cookies.txt",
-    # 3. Dropped manually in the app root (simplest VPS setup).
-    _APP_DIR / "cookies.txt",
-    _APP_DIR / "youtube_cookies.txt",
-]
-
-
-def _server_cookies_file() -> Path | None:
-    """Return the first cookies.txt that exists, or None."""
-    for p in _COOKIE_CANDIDATES:
-        if p is not None and p.exists():
-            return p
-    return None
-
-
-def cookies_configured() -> bool:
-    """Return True if a cookies file is available for yt-dlp."""
-    return _server_cookies_file() is not None
-
-
-def _is_bot_error(text: str) -> bool:
-    t = text.lower()
-    return any(s in t for s in _BOT_SIGNALS)
+# Set this env var on the VPS to a Netscape-format cookies.txt exported from your browser.
+# Example: export YT_COOKIES_FILE=/home/user/yt-cookies.txt
+_COOKIES_FILE = os.environ.get("YT_COOKIES_FILE", "")
 
 
 def _extract_with_fallbacks(url: str, options: dict) -> dict:
-    """Try downloading, using server-side cookies automatically if present."""
-    base_opts = dict(options)
-    base_opts["http_headers"] = _BROWSER_HEADERS
-    base_opts.setdefault("sleep_interval", 1)
-    base_opts.setdefault("max_sleep_interval", 3)
-    base_opts.setdefault("socket_timeout", 60)
+    """Try downloading; if a cookies file is configured use it directly, otherwise retry with browser cookies."""
+    # Cookie file path configured on server — use it directly, skip browser attempts.
+    if _COOKIES_FILE and Path(_COOKIES_FILE).exists():
+        run_opts = dict(options)
+        run_opts["cookiefile"] = _COOKIES_FILE
+        with yt_dlp.YoutubeDL(run_opts) as ydl:
+            return ydl.extract_info(url, download=True)
 
-    attempts: list[dict] = []
-
-    cookies = _server_cookies_file()
-    if cookies:
-        opts = dict(base_opts)
-        opts["cookiefile"] = str(cookies)
-        attempts.append(opts)
-
-    # Plain attempt — works for most videos that aren't region/age-locked.
-    attempts.append(dict(base_opts))
-
-    # Browser-cookie fallbacks (useful on desktop installs, silently skipped on VPS).
-    for browser in ("edge", "firefox", "chrome"):
-        opts = dict(base_opts)
-        opts["cookiesfrombrowser"] = (browser,)
-        attempts.append(opts)
-
+    attempts = [None, "edge", "firefox", "chrome"]
     last_error: Exception | None = None
-    for run_opts in attempts:
+
+    for browser in attempts:
+        run_opts = dict(options)
+        if browser:
+            run_opts["cookiesfrombrowser"] = (browser,)
+
         try:
             with yt_dlp.YoutubeDL(run_opts) as ydl:
                 return ydl.extract_info(url, download=True)
         except DownloadError as exc:
             last_error = exc
-            if not _is_bot_error(str(exc)):
+            text = str(exc).lower()
+            if (
+                "sign in to confirm you're not a bot" not in text
+                and "cookies" not in text
+                and "cookie database" not in text
+            ):
                 raise
         except Exception as exc:
+            # Some cookie backends fail when browser DB is locked (common on Chrome).
+            # Keep trying other browser sources before failing.
             last_error = exc
-            if not _is_bot_error(str(exc)):
+            text = str(exc).lower()
+            if "cookie database" not in text and "cookies" not in text:
                 raise
 
-    if cookies:
-        detail = (
-            "YouTube rejected the cookies.txt (it may have expired). "
-            "Please export a fresh cookies.txt from your browser while logged in to YouTube "
-            "and replace the file on the server."
-        )
-    else:
-        detail = (
-            "YouTube blocked the download (bot/datacenter IP detection). "
-            "Place a 'cookies.txt' exported from your YouTube-logged-in browser "
-            "into the app root folder on the server, or set the "
-            "YOUTUBE_COOKIES_FILE environment variable to its path."
-        )
-    raise RuntimeError(detail) from last_error
+    if last_error is not None:
+        raise RuntimeError(
+            "YouTube blocked anonymous download. Please sign in to YouTube in Chrome/Edge, then retry."
+        ) from last_error
+
+    raise RuntimeError("Failed to download video.")
 
 
-def download_video(
-    url: str,
-    output_dir: str | Path,
-) -> Tuple[Path, Path, str]:
+def download_video(url: str, output_dir: str | Path) -> Tuple[Path, Path, str]:
     """Download a YouTube video and extract best available audio.
-
-    Cookies are resolved automatically from the server configuration — callers
-    do not need to supply them.  See _server_cookies_file() for lookup order.
 
     Returns (video_path, audio_path, base_id).
     """
@@ -155,6 +92,7 @@ def download_video(
 
     audio_path = target / f"{base_id}.m4a"
     if not audio_path.exists():
+        # Keep this audio extraction in yt-dlp to avoid extra ffmpeg call from Python.
         audio_opts = {
             "format": "bestaudio/best",
             "outtmpl": str(target / "%(id)s.%(ext)s"),

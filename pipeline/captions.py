@@ -31,12 +31,31 @@ def _text_transform(text: str, mode: str) -> str:
 
 def _line_intro_override(preset: str) -> str:
     if preset == "punch":
-        return "{\\an2\\fad(30,80)\\blur0.6}"
+        return "{\\fad(30,80)\\blur0.6}"
     if preset == "smooth":
-        return "{\\an2\\fad(120,120)\\blur1.0}"
+        return "{\\fad(120,120)\\blur1.0}"
     if preset == "pop":
-        return "{\\an2\\fad(50,60)\\bord4}"
+        return "{\\fad(50,60)\\bord4}"
     return ""
+
+
+def _align_for_position(base_alignment: int, position: str) -> int:
+    left = {1, 4, 7}
+    center = {2, 5, 8}
+    right = {3, 6, 9}
+
+    if base_alignment in left:
+        axis = "left"
+    elif base_alignment in right:
+        axis = "right"
+    else:
+        axis = "center"
+
+    if position == "top":
+        return {"left": 7, "center": 8, "right": 9}[axis]
+    if position == "middle":
+        return {"left": 4, "center": 5, "right": 6}[axis]
+    return {"left": 1, "center": 2, "right": 3}[axis]
 
 
 def _group_words(words: List[Dict[str, Any]], max_words: int = 5) -> List[List[Dict[str, Any]]]:
@@ -69,6 +88,13 @@ def build_ass_file(
     output_path: str | Path,
     caption_energy: float = 1.0,
     segments: List[Dict[str, float]] | None = None,
+    caption_position: str = "bottom",
+    caption_font_scale: float = 1.0,
+    caption_max_words_per_line: int = 0,
+    caption_margin_v: int = 0,
+    caption_text_case: str = "auto",
+    caption_animation: str = "auto",
+    caption_karaoke_speed: float = 1.0,
 ) -> Path:
     template = _load_template(template_name)
 
@@ -103,28 +129,44 @@ def build_ass_file(
     if not scoped:
         raise RuntimeError("No words found for clip caption range.")
 
+    base_alignment = int(template.get("alignment", 2))
+    style_alignment = _align_for_position(base_alignment, caption_position)
+
+    font_size = int(round(float(template["font_size"]) * max(0.7, min(1.8, caption_font_scale))))
+    margin_v = int(caption_margin_v) if int(caption_margin_v) > 0 else int(template["margin_v"])
+
     style_line = (
         "Style: Default,{font},{size},{primary},{secondary},{outline},{back},"
         "0,0,0,0,100,100,0,0,1,{outline_w},{shadow},{align},{l},{r},{v},1"
     ).format(
         font=template["font_name"],
-        size=template["font_size"],
+        size=font_size,
         primary=template["primary_color"],
         secondary=template["highlight_color"],
         outline=template["outline_color"],
         back=template["back_color"],
         outline_w=template["outline_width"],
         shadow=template["shadow"],
-        align=template["alignment"],
+        align=style_alignment,
         l=template["margin_l"],
         r=template["margin_r"],
-        v=template["margin_v"],
+        v=margin_v,
     )
 
-    groups = _group_words(scoped, max_words=template.get("max_words_per_line", 5))
-    preset = str(template.get("animation_preset", "smooth"))
-    text_case = str(template.get("text_case", "none"))
-    speed = max(0.7, min(1.7, float(template.get("karaoke_speed", 1.0)) * max(0.65, min(1.5, caption_energy))))
+    max_words = int(caption_max_words_per_line) if int(caption_max_words_per_line) > 0 else int(template.get("max_words_per_line", 5))
+    groups = _group_words(scoped, max_words=max_words)
+
+    preset = str(template.get("animation_preset", "smooth")) if caption_animation == "auto" else caption_animation
+    text_case = str(template.get("text_case", "none")) if caption_text_case == "auto" else caption_text_case
+    speed = max(
+        0.7,
+        min(
+            1.7,
+            float(template.get("karaoke_speed", 1.0))
+            * max(0.65, min(1.5, caption_energy))
+            * max(0.7, min(1.7, caption_karaoke_speed)),
+        ),
+    )
 
     dialogues: List[str] = []
     for group in groups:
@@ -138,7 +180,7 @@ def build_ass_file(
             safe_word = _escape_ass_text(_text_transform(str(word["word"]), text_case))
             tokens.append(f"{{\\kf{dur_cs}}}{safe_word}")
 
-        text = _line_intro_override(preset) + " ".join(tokens)
+        text = f"{{\\an{style_alignment}}}" + _line_intro_override(preset) + " ".join(tokens)
         dialogues.append(
             f"Dialogue: 0,{_ass_time(g_start)},{_ass_time(g_end)},Default,,0,0,0,,{text}"
         )

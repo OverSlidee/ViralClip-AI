@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Sora:wght@500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.css?v=20260527a">
 </head>
 <body>
   <main class="shell aura-bg">
@@ -115,6 +115,57 @@
           </div>
         </div>
 
+        <div class="grid three">
+          <div>
+            <label for="captionPosition">Caption position</label>
+            <select id="captionPosition">
+              <option value="top">Top</option>
+              <option value="middle">Middle</option>
+              <option value="bottom" selected>Bottom</option>
+            </select>
+          </div>
+          <div>
+            <label for="captionFontScale">Caption size scale</label>
+            <input id="captionFontScale" type="number" min="0.7" max="1.8" step="0.1" value="1.0">
+          </div>
+          <div>
+            <label for="captionMaxWords">Max words/line (0 = template)</label>
+            <input id="captionMaxWords" type="number" min="0" max="10" value="0">
+          </div>
+        </div>
+
+        <div class="grid three">
+          <div>
+            <label for="captionMarginV">Vertical margin px (0 = template)</label>
+            <input id="captionMarginV" type="number" min="0" max="600" value="0">
+          </div>
+          <div>
+            <label for="captionTextCase">Text case</label>
+            <select id="captionTextCase">
+              <option value="auto" selected>Template default</option>
+              <option value="none">No transform</option>
+              <option value="upper">UPPERCASE</option>
+              <option value="lower">lowercase</option>
+            </select>
+          </div>
+          <div>
+            <label for="captionAnimation">Caption animation</label>
+            <select id="captionAnimation">
+              <option value="auto" selected>Template default</option>
+              <option value="smooth">Smooth</option>
+              <option value="punch">Punch</option>
+              <option value="pop">Pop</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid three">
+          <div>
+            <label for="captionKaraokeSpeed">Karaoke speed</label>
+            <input id="captionKaraokeSpeed" type="number" min="0.7" max="1.7" step="0.1" value="1.0">
+          </div>
+        </div>
+
         <div id="brollOptions" class="broll hidden">
           <label>B-roll source</label>
           <div class="row">
@@ -147,6 +198,6 @@
     </section>
   </main>
 
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v=20260527a"></script>
 </body>
 </html>

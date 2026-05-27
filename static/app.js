@@ -7,6 +7,13 @@ const maxClipDuration = document.getElementById('maxClipDuration');
 const hookRecut = document.getElementById('hookRecut');
 const hookDuration = document.getElementById('hookDuration');
 const captionEnergy = document.getElementById('captionEnergy');
+const captionPosition = document.getElementById('captionPosition');
+const captionFontScale = document.getElementById('captionFontScale');
+const captionMaxWords = document.getElementById('captionMaxWords');
+const captionMarginV = document.getElementById('captionMarginV');
+const captionTextCase = document.getElementById('captionTextCase');
+const captionAnimation = document.getElementById('captionAnimation');
+const captionKaraokeSpeed = document.getElementById('captionKaraokeSpeed');
 const faceTracking = document.getElementById('faceTracking');
 const brollEnabled = document.getElementById('brollEnabled');
 const abTestMode = document.getElementById('abTestMode');
@@ -178,6 +185,7 @@ runBtn.addEventListener('click', async () => {
 
   runBtn.disabled = true;
   addProgress('Submitting job...');
+  addProgress(`Caption position set to: ${captionPosition.value}`);
 
   const body = {
     url,
@@ -190,6 +198,13 @@ runBtn.addEventListener('click', async () => {
     hook_recut: hookRecut.value === 'true',
     hook_duration: Number(hookDuration.value || 4),
     caption_energy: Number(captionEnergy.value || 1),
+    caption_position: captionPosition.value,
+    caption_font_scale: Number(captionFontScale.value || 1),
+    caption_max_words_per_line: Number(captionMaxWords.value || 0),
+    caption_margin_v: Number(captionMarginV.value || 0),
+    caption_text_case: captionTextCase.value,
+    caption_animation: captionAnimation.value,
+    caption_karaoke_speed: Number(captionKaraokeSpeed.value || 1),
     face_tracking: faceTracking.checked,
     broll_enabled: brollEnabled.checked,
     broll_source: currentBrollSource(),

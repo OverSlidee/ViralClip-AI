@@ -60,6 +60,13 @@ class ProcessRequest(BaseModel):
     hook_recut: bool = False
     hook_duration: float = Field(default=4.0, ge=2.0, le=6.0)
     caption_energy: float = Field(default=1.0, ge=0.7, le=1.5)
+    caption_position: str = Field(default="bottom", pattern="^(top|middle|bottom)$")
+    caption_font_scale: float = Field(default=1.0, ge=0.7, le=1.8)
+    caption_max_words_per_line: int = Field(default=0, ge=0, le=10)
+    caption_margin_v: int = Field(default=0, ge=0, le=600)
+    caption_text_case: str = Field(default="auto", pattern="^(auto|none|upper|lower)$")
+    caption_animation: str = Field(default="auto", pattern="^(auto|smooth|punch|pop)$")
+    caption_karaoke_speed: float = Field(default=1.0, ge=0.7, le=1.7)
     face_tracking: bool = False
     broll_enabled: bool = False
     broll_source: str = Field(default="local", pattern="^(local|pexels|both)$")
@@ -265,6 +272,13 @@ async def _run_pipeline(job_id: str, req: ProcessRequest) -> None:
                 ass_file,
                 req.caption_energy,
                 montage_segments,
+                req.caption_position,
+                req.caption_font_scale,
+                req.caption_max_words_per_line,
+                req.caption_margin_v,
+                req.caption_text_case,
+                req.caption_animation,
+                req.caption_karaoke_speed,
             )
 
             face_center_x = None

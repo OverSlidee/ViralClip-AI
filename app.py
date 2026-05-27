@@ -9,8 +9,8 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 import ollama
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
+from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
@@ -73,6 +73,7 @@ class ProcessRequest(BaseModel):
     broll_style: str = Field(default="safe_pip", pattern="^(safe_pip|fullscreen)$")
     ab_test_mode: bool = False
     pexels_api_key: str = ""
+    cookies_file: str = ""  # Path to an uploaded cookies.txt for VPS bot-detection bypass
 
 
 JOBS: Dict[str, Dict[str, Any]] = {}
@@ -212,7 +213,12 @@ async def _run_pipeline(job_id: str, req: ProcessRequest) -> None:
 
     try:
         _emit(job_id, "downloading", "Downloading source video")
-        video_path, audio_path, base_id = await asyncio.to_thread(download_video, req.url, dl_dir)
+        cookies_path = Path(req.cookies_file) if req.cookies_file else None
+        if cookies_path and not cookies_path.exists():
+            cookies_path = None
+        video_path, audio_path, base_id = await asyncio.to_thread(
+            download_video, req.url, dl_dir, cookies_path
+        )
 
         _emit(job_id, "transcribing", "Generating timestamped transcript")
         words = await asyncio.to_thread(transcribe, audio_path, req.whisper_model)
@@ -470,6 +476,32 @@ async def templates_meta() -> Dict[str, Any]:
 async def health() -> Dict[str, Any]:
     deps = await asyncio.to_thread(_dependency_health)
     return {"ok": deps["ffmpeg"]["ok"] and deps["ollama"]["ok"], "dependencies": deps}
+
+
+# Directory where uploaded cookies files are stored (excluded from git via .gitignore).
+COOKIES_DIR = BASE_DIR / "uploads" / "cookies"
+COOKIES_DIR.mkdir(parents=True, exist_ok=True)
+
+
+@app.post("/api/upload-cookies")
+async def upload_cookies(file: UploadFile = File(...)) -> Dict[str, str]:
+    """Accept a Netscape-format cookies.txt file and return its server path."""
+    if file.filename and not file.filename.endswith(".txt"):
+        raise HTTPException(status_code=400, detail="Please upload a .txt cookies file.")
+
+    # Overwrite any previous upload — one file per instance is enough.
+    dest = COOKIES_DIR / "youtube_cookies.txt"
+    content = await file.read()
+    if len(content) > 5 * 1024 * 1024:  # 5 MB sanity limit
+        raise HTTPException(status_code=413, detail="Cookies file is too large (max 5 MB).")
+    dest.write_bytes(content)
+    return {"cookies_file": str(dest), "message": "Cookies uploaded successfully."}
+
+
+@app.get("/api/cookies-status")
+async def cookies_status() -> Dict[str, Any]:
+    dest = COOKIES_DIR / "youtube_cookies.txt"
+    return {"uploaded": dest.exists(), "path": str(dest) if dest.exists() else ""}
 
 
 @app.post("/api/process")

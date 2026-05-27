@@ -233,6 +233,35 @@ button:hover,
   font-size: 0.9rem;
 }
 
+/* Cookie upload section */
+.section-block {
+  margin-top: 18px;
+}
+.section-block summary {
+  cursor: pointer;
+  color: var(--text);
+  user-select: none;
+}
+.cookie-section {
+  margin-top: 10px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  padding: 12px;
+}
+.cookie-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.cookie-status {
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.cookie-status.ok   { color: var(--accent); }
+.cookie-status.error { color: var(--danger); }
+
 .template-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

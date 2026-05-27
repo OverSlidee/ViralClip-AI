@@ -6,47 +6,98 @@ from typing import Tuple
 import yt_dlp
 from yt_dlp.utils import DownloadError
 
+# VPS-friendly headers that reduce the chance of being fingerprinted as a bot.
+_BROWSER_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
+    ),
+    "Accept-Language": "en-US,en;q=0.9",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+}
 
-def _extract_with_fallbacks(url: str, options: dict) -> dict:
-    """Try downloading normally, then retry with browser cookies if blocked by YouTube."""
-    attempts = [None, "edge", "firefox", "chrome"]
+_BOT_SIGNALS = (
+    "sign in to confirm",
+    "cookies",
+    "cookie database",
+    "blocked",
+    "bot",
+    "too many requests",
+)
+
+
+def _is_bot_error(text: str) -> bool:
+    t = text.lower()
+    return any(s in t for s in _BOT_SIGNALS)
+
+
+def _extract_with_fallbacks(
+    url: str,
+    options: dict,
+    cookies_file: str | Path | None = None,
+) -> dict:
+    """Try downloading with optional cookies file first, then browser cookie extraction."""
+    base_opts = dict(options)
+    base_opts["http_headers"] = _BROWSER_HEADERS
+    base_opts.setdefault("sleep_interval", 1)
+    base_opts.setdefault("max_sleep_interval", 3)
+    base_opts.setdefault("socket_timeout", 60)
+
+    # Build attempt list: cookies-file first if supplied, then browser fallbacks on non-VPS.
+    attempts: list[dict] = []
+
+    if cookies_file and Path(cookies_file).exists():
+        opts = dict(base_opts)
+        opts["cookiefile"] = str(cookies_file)
+        attempts.append(opts)
+
+    # Plain attempt (no cookies) — may work for unlocked videos.
+    attempts.append(dict(base_opts))
+
+    # Browser-cookie fallbacks (only useful on desktops, harmless on VPS — they'll just fail fast).
+    for browser in ("edge", "firefox", "chrome"):
+        opts = dict(base_opts)
+        opts["cookiesfrombrowser"] = (browser,)
+        attempts.append(opts)
+
     last_error: Exception | None = None
-
-    for browser in attempts:
-        run_opts = dict(options)
-        if browser:
-            run_opts["cookiesfrombrowser"] = (browser,)
-
+    for run_opts in attempts:
         try:
             with yt_dlp.YoutubeDL(run_opts) as ydl:
                 return ydl.extract_info(url, download=True)
         except DownloadError as exc:
             last_error = exc
-            text = str(exc).lower()
-            if (
-                "sign in to confirm you're not a bot" not in text
-                and "cookies" not in text
-                and "cookie database" not in text
-            ):
+            if not _is_bot_error(str(exc)):
                 raise
         except Exception as exc:
-            # Some cookie backends fail when browser DB is locked (common on Chrome).
-            # Keep trying other browser sources before failing.
             last_error = exc
-            text = str(exc).lower()
-            if "cookie database" not in text and "cookies" not in text:
+            if not _is_bot_error(str(exc)):
                 raise
 
-    if last_error is not None:
-        raise RuntimeError(
-            "YouTube blocked anonymous download. Please sign in to YouTube in Chrome/Edge, then retry."
-        ) from last_error
+    if cookies_file and Path(cookies_file).exists():
+        detail = "The supplied cookies.txt was rejected by YouTube. Please export a fresh one."
+    else:
+        detail = (
+            "YouTube blocked the download (bot detection). "
+            "Export a cookies.txt from your browser while logged in to YouTube "
+            "and upload it in the Cookies section of the app."
+        )
+    raise RuntimeError(detail) from last_error
 
-    raise RuntimeError("Failed to download video.")
 
-
-def download_video(url: str, output_dir: str | Path) -> Tuple[Path, Path, str]:
+def download_video(
+    url: str,
+    output_dir: str | Path,
+    cookies_file: str | Path | None = None,
+) -> Tuple[Path, Path, str]:
     """Download a YouTube video and extract best available audio.
+
+    Args:
+        url: YouTube video URL.
+        output_dir: Directory to save files into.
+        cookies_file: Optional path to a Netscape-format cookies.txt file.
+                      Required on VPS/server environments to bypass bot detection.
 
     Returns (video_path, audio_path, base_id).
     """
@@ -62,7 +113,7 @@ def download_video(url: str, output_dir: str | Path) -> Tuple[Path, Path, str]:
         "no_warnings": True,
     }
 
-    info = _extract_with_fallbacks(url, ydl_opts)
+    info = _extract_with_fallbacks(url, ydl_opts, cookies_file)
 
     base_id = info.get("id")
     if not base_id:
@@ -95,7 +146,7 @@ def download_video(url: str, output_dir: str | Path) -> Tuple[Path, Path, str]:
                 }
             ],
         }
-        _extract_with_fallbacks(url, audio_opts)
+        _extract_with_fallbacks(url, audio_opts, cookies_file)
 
     if not audio_path.exists():
         # Fallback to mp3 extension if m4a is not available due to source format.

@@ -183,6 +183,25 @@
           <p class="hint">Drop local B-roll files into the broll_library folder. Filename keywords improve matching.</p>
         </div>
 
+        <!-- ── VPS / YouTube cookie bypass ─────────────────────────────────── -->
+        <details class="section-block">
+          <summary><strong>YouTube Cookies (VPS / Bot-detection fix)</strong></summary>
+          <div class="cookie-section">
+            <p class="hint">
+              If you're running on a VPS and YouTube blocks the download, export a
+              <code>cookies.txt</code> from your browser while logged in to YouTube
+              (use the <em>Get cookies.txt LOCALLY</em> Chrome/Firefox extension),
+              then upload it here. The file is stored on the server and reused for
+              all future downloads until you replace it.
+            </p>
+            <div class="cookie-row">
+              <input id="cookiesFile" type="file" accept=".txt">
+              <button type="button" id="uploadCookiesBtn">Upload cookies.txt</button>
+              <span id="cookiesStatus" class="cookie-status"></span>
+            </div>
+          </div>
+        </details>
+
         <button id="runBtn">Generate Shorts</button>
       </div>
 

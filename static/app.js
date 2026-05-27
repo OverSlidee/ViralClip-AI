@@ -20,7 +20,53 @@ const abTestMode = document.getElementById('abTestMode');
 const brollOptions = document.getElementById('brollOptions');
 const brollStyle = document.getElementById('brollStyle');
 const pexelsApiKey = document.getElementById('pexelsApiKey');
+const cookiesFile = document.getElementById('cookiesFile');
+const uploadCookiesBtn = document.getElementById('uploadCookiesBtn');
+const cookiesStatus = document.getElementById('cookiesStatus');
 const runBtn = document.getElementById('runBtn');
+
+// Track the server-side cookies path after upload.
+let activeCookiesFile = '';
+
+// Check if cookies are already uploaded on the server.
+fetch('/api/cookies-status').then(r => r.json()).then(data => {
+  if (data.uploaded) {
+    activeCookiesFile = data.path;
+    cookiesStatus.textContent = '\u2705 cookies.txt is active';
+    cookiesStatus.className = 'cookie-status ok';
+  }
+}).catch(() => {});
+
+if (uploadCookiesBtn) {
+  uploadCookiesBtn.addEventListener('click', async () => {
+    if (!cookiesFile.files.length) {
+      alert('Please select a cookies.txt file first.');
+      return;
+    }
+    uploadCookiesBtn.disabled = true;
+    cookiesStatus.textContent = 'Uploading...';
+    cookiesStatus.className = 'cookie-status';
+    const fd = new FormData();
+    fd.append('file', cookiesFile.files[0]);
+    try {
+      const resp = await fetch('/api/upload-cookies', { method: 'POST', body: fd });
+      const data = await resp.json();
+      if (resp.ok) {
+        activeCookiesFile = data.cookies_file;
+        cookiesStatus.textContent = '\u2705 ' + data.message;
+        cookiesStatus.className = 'cookie-status ok';
+      } else {
+        cookiesStatus.textContent = '\u274C ' + (data.detail || 'Upload failed.');
+        cookiesStatus.className = 'cookie-status error';
+      }
+    } catch (e) {
+      cookiesStatus.textContent = '\u274C Network error during upload.';
+      cookiesStatus.className = 'cookie-status error';
+    } finally {
+      uploadCookiesBtn.disabled = false;
+    }
+  });
+}
 const progressList = document.getElementById('progressList');
 const results = document.getElementById('results');
 const ffmpegChip = document.getElementById('ffmpegChip');
@@ -210,7 +256,8 @@ runBtn.addEventListener('click', async () => {
     broll_source: currentBrollSource(),
     broll_style: brollStyle.value,
     ab_test_mode: abTestMode.checked,
-    pexels_api_key: pexelsApiKey.value.trim()
+    pexels_api_key: pexelsApiKey.value.trim(),
+    cookies_file: activeCookiesFile
   };
 
   const startResp = await fetch('/api/process', {
